@@ -87,8 +87,6 @@ protected:
 
   // Do i need to output intensity for a slice write?
   int need_I;
-  // Use line or optically thin cooling
-  int ELTE_on;
 // MPI
   int myrank,verbose,lrank[3];
   int cart_sizes[3];
@@ -101,16 +99,14 @@ protected:
   int zl,zh,nz,zo;
 // driver
   int ***** numits;
-  double *I_o, *I_n, *I_n1;
+  double *I_o, *I_n;
   int ibase[NMU],ixstep[4],iystep[4],izstep[4];
   double *Fx,*Fy,*Fz;
   double a_00[3][NMU],a_01[3][NMU],a_10[3][NMU],a_11[3][NMU];
   double *Tau;
   double  xmu[3][NMU],wmu[NMU];
   double  ds_upw[NMU];//, ds_dnw[NMU] ,dz_upw, dz_dnw;
-  double *coeff,*coeff1,*coeff2,*dc;
-  //double dc0,dc1,dc2,dc3;
-  //int dsize;
+  double *coeff;
 // wrapper
   double F_o,dt_rad;
   double * Fr_mean, * gFr_mean;
@@ -170,31 +166,29 @@ protected:
   float ** abn_pp_tab;
   float ** sig_pp_tab;
 
-  //
-  double  delta_t1,delta_t2;
   real *x_oldbuf,*y_oldbuf,*z_oldbuf;
   real *x_sbuf,*y_sbuf,*z_sbuf;
   real *x_rbuf,*y_rbuf,*z_rbuf;
+  /* Scratch row used by exchange() to stage the x->z corner transfer. Held as
+   * a member rather than a stack array so its device mapping is created once
+   * and stays valid; a stack VLA mapped per call leaks a present-table entry
+   * on every one of the thousands of exchange() calls per timestep, keyed on
+   * an address that is only meaningful inside that call. */
+  real *ex_tmp;
   int isgbeg[3],isgend[3],next[3];
   int call_count;
-  int fail_count;
-  int total_iter;
 
   double * I_band;
 
   double *tr_switch;
-  void driver(double DZ, double DX, double DY, int band); 
-  void interpol(int,int,int,int,int,int,int,int,int,int,double*,double*);
-  void IntegrateSetup(int yi_i, int xi_i, int zi_i, int ystep, int xstep, int zstep);
-  void integrate(const double c[4]);
-  void interpol_and_integrate(const double c[4], double * Ss, int l);
+  void driver(double DZ, double DX, double DY, int band);
   double error(int,int,int,int,int,double);
-  void readbuf(int band,int l,int  DIR,int XDIR,int YDIR);
-  void writebuf(int band, int l,int DIR,int XDIR,int YDIR);
   void exchange(int band,int l,int DIR,int XDIR,int YDIR);
-  void flux(int l,int DIR,int XDIR,int YDIR);
-  void qrad(const double DZ,const double DX,const double DY,const int band);
   void tauscale_qrad(int band, double DX,double DY,double DZ,double* Ss);
+  void accumulate_Iout();   // fold this band's I_band into the image I_o
+  // Outgoing intensity at the top by formal solution along the vertical.
+  // Shared by get_Tau_and_Iout (Ss=B -> I_band) and tauscale_qrad (Ss -> I_o).
+  void outgoing_intensity(double * Ss, double * dest, double & reduce_time);
   void calc_Qtot_and_Tau(GridData&, const RunData&, const PhysicsData&);
   void get_Tau_and_Iout(GridData&, const RunData&, const PhysicsData&, double DZ, float * B_Iout_tab, float * kap_Iout_tab, double * I_band, int calc_Int);
   void load_bins(char *);
@@ -208,8 +202,7 @@ public:
   virtual ~RTS(void);
   virtual double wrapper(int,GridData&,RunData&,const PhysicsData&);
   double TRSW(int,int,int);
-  double tau(int,int,int); 
-  double Qtot(int,int,int); 
+  double tau(int,int,int);
   double Stot(int,int,int);
   double Jtot(int,int,int);
   double Iout(int,int); 
@@ -228,7 +221,6 @@ void Transpose_Rho_Kap_B(
   double * B,   double * tB,
   const int nx, const int ny, const int nz
 );
-void Transpose_In(double * I_n, double * tI_n, const int nx, const int ny, const int nz);
 void Untranspose_In(double * I_n, double * tI_n, const int nx, const int ny, const int nz);
 void Transpose_integrate_kernel(
   double * I_n, double * coeff,
