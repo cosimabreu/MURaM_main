@@ -1,21 +1,21 @@
-# output name
-MURaM_HOME_DIR=/u/damp/MURaM_GPU/MURaM_main/
+MURaM_HOME_DIR = /glade/work/rempel/MURaM_NCAR/MURaM_main/
+FFTW3_HOME = $(MURaM_HOME_DIR)/FFTW_LIBS/fftw_26.1
+HEFFTE_HOME = $(MURaM_HOME_DIR)/FFTW_LIBS/heffte_cpu_26.1
+CUDA_HOME =
 
 # FFT = FFTW or HEFFTE or HEFFTE_CPU
-FFT_MODE=FFTW    #HEFFTE_CPU
-CUDA_HOME=/mpcdf/soft/SLE_15/packages/x86_64/nvhpcsdk/21.11/Linux_x86_64/21.11/cuda/11.5
-CUDATOOLS=/mpcdf/soft/SLE_15/packages/x86_64/nvhpcsdk/21.11/Linux_x86_64/21.11/math_libs/11.5
+FFT =HEFFTE_CPU
 
-FFTW3_HOME=/u/damp/lib/fftw3310/nvhpc_21.11_ompi_4.1.2_UCX_gpfs_O3
-HEFFTE_HOME=/u/damp/lib/heffte_fftw3310/nvhpc_21.11_ompi_4.1.2_UCX_gpfs_O3_nogpud
-
+# output name
 PROGRAM = mhd3d.x
 
 # Optimization option
-OPT = -O0 -acc -gpu=cc80,nofma,lineinfo -Minfo=accel -Mnofma -std=c++11
+OPT = -O2 -std=c++11 -Mnofma #-ta=tesla:cc70 -Minfo=accel
+#OPT = -O2 -acc=multicore -Minfo=accel -std=c++11 #-Mnofma
+#OPT = -O3 -acc -gpu=cc80,nofma,lineinfo -Minfo=accel -Mnofma -std=c++11
 
 # Debugging option (for development) use -pg -g3
-DBG = -Wall
+#DBG = -g
 
 # FILEPATH option (default: ./) - This is useful
 # to write files to special directories on some machines
@@ -26,7 +26,7 @@ ARCH = rs6000
 ########################################################
 
 ######## Custom Flags for MURaM ########################
-CUSTOM_FLAGS = -DMURAM_$(FFT_MODE)
+CUSTOM_FLAGS = -DMURAM_$(FFT)
 
 ######## The shell command #############################
 SHELL=/bin/sh
@@ -38,13 +38,13 @@ FFTWHOME   = $(FFTW3_HOME)
 FFTWLIBDIR = -L$(FFTWHOME)/lib
 FFTWINCDIR = -I$(FFTWHOME)/include
 
-ifeq ($(FFT_MODE), FFTW)
+ifeq ($(FFT), FFTW)
 FFTWLIB = -lfftw3_mpi -lfftw3_threads -lfftw3
 endif
-ifeq ($(FFT_MODE), HEFFTE_CPU)
+ifeq ($(FFT), HEFFTE_CPU)
 FFTWLIB = -lfftw3 -lfftw3f
 endif
-ifeq ($(FFT_MODE), HEFFTE)
+ifeq ($(FFT), HEFFTE)
 FFTWLIB = -lfftw3 -lfftw3f
 endif
 
@@ -54,13 +54,10 @@ FFTWLIB =
 FFTWLIBDIR =
 FFTWINCDIR =
 endif
-########################################################
+######## CUDA Options ##################################
 ifdef CUDA_HOME
 CUDAHOME = $(CUDA_HOME)
-CUDAFFT = -lcufft
-CUDAFFTLIB = -L$(CUDATOOLS)/lib64
-CUDAFFTINC = -I$(CUDATOOLS)/include
-CUDALIB = -lcudart
+CUDALIB = -lcufft -lcudart
 CUDALIBDIR = -L$(CUDAHOME)/lib64
 CUDAINCDIR = -I$(CUDAHOME)/include
 else
@@ -101,22 +98,32 @@ MPIOLIB=
           
 DEFS = $(OPT) $(CUSTOM_FLAGS) $(DBG) $(PRE)
 
+######### Automatic header dependencies ################
+# -MMD emits a <object>.d file listing the project headers each object was
+#      compiled against, which the Makefiles -include so that editing a header
+#      rebuilds every object that uses it. Without this, changing e.g. rt.h
+#      leaves stale objects compiled against the old class layout, and the
+#      resulting binary silently reads members at the wrong offsets.
+# -MP  emits a phony target for each header so that renaming or deleting one
+#      does not abort the build with "No rule to make target".
+# Set to empty if building with a compiler that lacks these options.
+DEPFLAGS = -MMD -MP
+
 INCLUDES = -I../ -I$(MURaM_HOME_DIR)/include -I$(MURaM_HOME_DIR)/src/rt $(MPIINCDIR) $(MPIOINCDIR) \
-     $(HEFFTEINCDIR) $(FFTWINCDIR) $(CUDAINCDIR) $(CUDAFFTINC)
+     $(HEFFTEINCDIR) $(FFTWINCDIR) $(CUDAINCDIR)
 
 LIBS = $(MPILIBDIR) $(MPIOLIB) $(MPILIB) \
        $(HEFFTELIBDIR) $(HEFFTELIB) \
        $(FFTWLIBDIR) $(FFTWLIB) \
        $(CUDALIBDIR) $(CUDALIB) \
-       $(CUDAFFTLIB) $(CUDAFFT) \
        $(MASSLIB) -lm
 
 ######### C options #####################################
 CC     = mpicc
-LD     = mpic++
-CCC    = mpic++
+LD     = mpicxx -acc
+CCC    = mpicxx
 
-CFLAGS  = $(DEFS) $(INCLUDES)
+CFLAGS  = $(DEFS) $(INCLUDES)  $(DEPFLAGS) 
 CCFLAGS = $(CFLAGS)
 
 LDFLAGS      = $(DEFS) 

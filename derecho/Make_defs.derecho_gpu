@@ -1,4 +1,4 @@
-MURaM_HOME_DIR = /glade/work/rempel/MURaM_derecho_asd
+MURaM_HOME_DIR = /glade/work/rempel/MURaM_NCAR/MURaM_main/
 FFTW3_HOME = $(MURaM_HOME_DIR)/FFTW_LIBS/fftw_24.3
 HEFFTE_HOME = $(MURaM_HOME_DIR)/FFTW_LIBS/heffte_gpu_24.3
 
@@ -11,10 +11,10 @@ PROGRAM = mhd3d.x
 # Optimization option
 #OPT = -O3  -std=c++11 #-Mnofma #-ta=tesla:cc70 -Minfo=accel
 #OPT = -O3 -acc -gpu=cc80,nofma,lineinfo,nomanaged -stdpar  -Minfo=accel -Mnofma -std=c++11 
-OPT = -O2 -acc -gpu=cc80,lineinfo,nomanaged -stdpar  -Minfo=accel -std=c++11
+#OPT = -O2 -acc -gpu=cc80,lineinfo,nomanaged -stdpar  -Minfo=accel -std=c++11
 
 # Use this with 24.9
-#OPT = -O2 -acc -gpu=cc80,lineinfo,mem:separate -stdpar  -Minfo=accel -std=c++11
+OPT = -O2 -acc -gpu=cc80,lineinfo,mem:separate -stdpar  -Minfo=accel -std=c++11
 
 # Debugging option (for development) use -pg -g3
 #DBG = -g
@@ -97,11 +97,19 @@ MPIOINCDIR=
 MPIOLIB=
 
 ######### General options ##############################
-#
-# All the relevant definitions are now in include/alconfig.h
-# 
-          
+
 DEFS = $(OPT) $(CUSTOM_FLAGS) $(DBG) $(PRE)
+
+######### Automatic header dependencies ################
+# -MMD emits a <object>.d file listing the project headers each object was
+#      compiled against, which the Makefiles -include so that editing a header
+#      rebuilds every object that uses it. Without this, changing e.g. rt.h
+#      leaves stale objects compiled against the old class layout, and the
+#      resulting binary silently reads members at the wrong offsets.
+# -MP  emits a phony target for each header so that renaming or deleting one
+#      does not abort the build with "No rule to make target".
+# Set to empty if building with a compiler that lacks these options.
+DEPFLAGS = -MMD -MP 
 
 INCLUDES = -I../ -I$(MURaM_HOME_DIR)/include -I$(MURaM_HOME_DIR)/src/rt $(MPIINCDIR) $(MPIOINCDIR) \
      $(HEFFTEINCDIR) $(FFTWINCDIR) $(CUDAINCDIR)
@@ -114,10 +122,10 @@ LIBS = $(MPILIBDIR) $(MPIOLIB) $(MPILIB) \
 
 ######### C options #####################################
 CC     = mpicc
-LD     = mpicxx
+LD     = mpicxx -acc
 CCC    = mpicxx
 
-CFLAGS  = $(DEFS) $(INCLUDES)
+CFLAGS  = $(DEFS) $(INCLUDES)  $(DEPFLAGS) 
 CCFLAGS = $(CFLAGS)
 
 LDFLAGS      = $(DEFS) 

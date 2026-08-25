@@ -7,9 +7,10 @@ DEST	      = .
 PROGRAM       = mhd3d
 
 OBJS          = rt.o mem.o
+DEPS          = $(OBJS:.o=.d)
 
-SUBDIRS       = 
-                
+SUBDIRS       =
+
 LIBRARY       = librt.a
 
 all:            
@@ -31,18 +32,23 @@ all:
 
 clean:
 		@list='$(SUBDIRS)' ; for subdir in $$list ; do $(MAKE) clean -C   $$subdir; done
-		$(RM) -f $(OBJS) core $(LIBRARY)
+		$(RM) -f $(OBJS) $(DEPS) core $(LIBRARY)
 
 distclean:
 		@list='$(SUBDIRS)' ; for subdir in $$list ; do $(MAKE) distclean -C   $$subdir; done
-		$(RM) -f $(OBJS) core $(LIBRARY) 
+		$(RM) -f $(OBJS) $(DEPS) core $(LIBRARY)
 
-dep:		depend
+# Header dependencies are generated automatically by $(DEPFLAGS) at compile
+# time (see Make_defs); no separate pass is needed. Kept as a no-op so that
+# existing scripts calling "make dep" still succeed.
+dep depend:
+		@echo "Header dependencies are generated automatically during compilation."
 
-depend:
-		@list='$(SUBDIRS)' ; for subdir in $$list ; do $(MAKE) depend -C   $$subdir; done
-		@makedepend -f $(MAKEFILE) $(SRCS)
+update:		$(DEST)/$(LIBRARY)
 
-update:		$(DEST)/$(LIBRARY) 
+.PHONY: all clean distclean dep depend update
 
-# DO NOT DELETE THIS LINE -- make depend depends on it.
+# Pull in the generated dependency files. The leading '-' suppresses errors on
+# the first build, when no .d files exist yet. This must stay below the 'all'
+# target so that an included .d cannot become the default goal.
+-include $(DEPS)

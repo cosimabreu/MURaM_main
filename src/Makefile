@@ -39,7 +39,9 @@ OBJS = ACCH.o \
        boundary_pdmp_1_fftw3.o \
        solver.o \
        eos_init.o \
-       cons_to_prim.o 
+       cons_to_prim.o
+
+DEPS = $(OBJS:.o=.d)
 
 all:
 	@list='$(SUBDIRS)' ; for subdir in $$list ; do $(MAKE) all -C   $$subdir ; done
@@ -50,23 +52,27 @@ all:
 
 clean:
 	@list='$(SUBDIRS)' ; for subdir in $$list ; do $(MAKE) clean -C   $$subdir ; done
-	rm -f $(OBJS) core
+	rm -f $(OBJS) $(DEPS) core
 
-distclean: 
+distclean:
 	@list='$(SUBDIRS)' ; for subdir in $$list ; do $(MAKE) distclean -C   $$subdir ; done
-	rm -f $(OBJS) core $(PROGRAM) 
+	rm -f $(OBJS) $(DEPS) core $(PROGRAM)
 
 install:
 	cp -v $(PROGRAM) /usr/local/bin/
 
-dep:
-	@list='$(SUBDIRS)' ; for subdir in $$list ; do $(MAKE) dep -C   $$subdir ; done
-	$(MAKE) makedepend
-
-makedepend:
-	@makedepend -f$(MAKEFILE) $(OBJS:.o=.cc) $(INCLUDE)
+# Header dependencies are generated automatically by $(DEPFLAGS) at compile
+# time (see Make_defs); no separate pass is needed. Kept as a no-op so that
+# existing scripts calling "make dep" still succeed.
+dep depend:
+	@echo "Header dependencies are generated automatically during compilation."
 
 update:
-	$(FILEPATH)/$(PROGRAM) 
+	$(FILEPATH)/$(PROGRAM)
 
-# DO NOT DELETE THIS LINE -- make depend depends on it.
+.PHONY: all clean distclean install dep depend update
+
+# Pull in the generated dependency files. The leading '-' suppresses errors on
+# the first build, when no .d files exist yet. This must stay below the 'all'
+# target so that an included .d cannot become the default goal.
+-include $(DEPS)
