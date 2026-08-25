@@ -670,7 +670,7 @@ void get_damping(const RunData&  Run, const GridData& Grid,
      }
 
 #pragma acc parallel loop collapse(3) \
- reduction(max:hh) \
+ reduction(max:hh) private(node) \
  present(Grid[:1], Grid.U[:Grid.bufsize], lbuf[:vsize])
     for(k=kbeg; k<=kend; k++) {
       for(j=jbeg; j<=jend; j++) {
@@ -703,7 +703,7 @@ void get_damping(const RunData&  Run, const GridData& Grid,
 
 #pragma acc parallel loop present(lbuf[:vsize])
   for(j=0;j<vsize;j++) lbuf[j] = 0.0;
-#pragma acc parallel loop collapse(3) \
+#pragma acc parallel loop collapse(3) private(node) \
  present(Grid[:1], Grid.U[:Grid.bufsize], lbuf[:vsize])
   for(k=kbeg; k<=kend; k++) {
     for(j=jbeg; j<=jend; j++) {
@@ -728,7 +728,7 @@ void get_damping(const RunData&  Run, const GridData& Grid,
   for(j=ibeg; j<=iend;j++){
      my_mean[j] = rlbuf[j];
   }
-#pragma acc parallel loop \
+#pragma acc parallel loop private(hh) \
  reduction(max:hmax) reduction(max:hphot) reduction(max:flxmax) reduction(max:vmax) \
  present(Grid[:1],my_mean[:vsize])
   for(j=ibeg; j<=iend; j++) {
